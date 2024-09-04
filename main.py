@@ -153,3 +153,81 @@ def get_alphabet(nfa):
             states_to_check.append(next_state)
 
     return alphabet
+
+# 4. Minimización del AFD
+def minimize_dfa(dfa):
+    states = set()
+    for (state, symbol) in dfa.transition_table.keys():
+        states.add(state)
+        states.add(dfa.transition_table.get((state, symbol), None))
+    states.discard(None)
+
+    non_accept_states = states - dfa.accept_states
+    partitions = [set(dfa.accept_states), non_accept_states]
+    new_partitions = []
+
+    while partitions != new_partitions:
+        if new_partitions:
+            partitions = new_partitions[:]
+            new_partitions = []
+
+        for group in partitions:
+            subgroups = {}
+            for state in group:
+                transition_signature = tuple(
+                    dfa.transition_table.get((state, symbol), None) for symbol in get_alphabet_from_dfa(dfa)
+                )
+                if transition_signature not in subgroups:
+                    subgroups[transition_signature] = set()
+                subgroups[transition_signature].add(state)
+            
+            new_partitions.extend(subgroups.values())
+
+    new_states = {}
+    for i, group in enumerate(new_partitions):
+        new_states[frozenset(group)] = i
+
+    minimized_transitions = {}
+    for (state, symbol) in dfa.transition_table.keys():
+        dest = dfa.transition_table.get((state, symbol), None)
+        if dest is not None:
+            source_group = None
+            dest_group = None
+            
+            for group in new_states.keys():
+                if state in group:
+                    source_group = group
+                if dest in group:
+                    dest_group = group
+            
+            if source_group is not None and dest_group is not None:
+                minimized_transitions[(new_states[source_group], symbol)] = new_states[dest_group]
+            else:
+                print(f"Error: No se encontró source_group o dest_group en new_states.")
+                print(f"source_group: {source_group}")
+                print(f"dest_group: {dest_group}")
+                print(f"new_states keys: {list(new_states.keys())}")
+                raise KeyError(f"Falta {dest_group} en new_states")
+
+    minimized_start_state = None
+    for group in new_partitions:
+        if dfa.start_state in group:
+            minimized_start_state = new_states[frozenset(group)]
+            break
+
+    if minimized_start_state is None:
+        print(f"Error: El estado inicial del DFA no se encuentra en new_states.")
+        print(f"dfa.start_state: {dfa.start_state}")
+        print(f"new_states keys: {list(new_states.keys())}")
+        raise KeyError(f"El estado inicial no se encuentra en new_states.")
+
+    minimized_accept_states = {new_states[frozenset(group)] for group in new_partitions if group & set(dfa.accept_states)}
+
+    return DFA(
+        minimized_start_state,
+        minimized_accept_states,
+        minimized_transitions
+    )
+
+def get_alphabet_from_dfa(dfa):
+    return set(symbol for (_, symbol) in dfa.transition_table.keys())
