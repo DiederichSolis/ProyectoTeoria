@@ -160,6 +160,9 @@ def thompson_construct(node):
         return NFA(start, accept)
 
 def nfa_to_dfa(nfa):
+    """
+    Convierte el AFN en AFD usando el algoritmo de subconjuntos.
+    """
     def epsilon_closure(states):
         closure = set(states)
         stack = list(states)
@@ -185,12 +188,15 @@ def nfa_to_dfa(nfa):
     unprocessed = [start_state_closure]
     dfa_accept_state = None
 
+    # Mapear los estados de aceptación del AFN
+    accept_states_nfa = {nfa.accept_state}
+
     while unprocessed:
         current_closure = unprocessed.pop()
         current_dfa_state = dfa_states[frozenset(current_closure)]
 
-        # Verificar si este conjunto de estados contiene un estado de aceptación
-        if any(state.is_accept for state in current_closure):
+        # Verificar si el conjunto de estados contiene un estado de aceptación del AFN
+        if any(state in accept_states_nfa for state in current_closure):
             current_dfa_state.is_accept = True
             dfa_accept_state = current_dfa_state
 
@@ -337,7 +343,6 @@ def draw_dfa(dfa):
     """
     Dibuja el AFD utilizando graphviz.
     """
-    import graphviz
     dot = graphviz.Digraph()
 
     def add_state(state):
@@ -361,16 +366,21 @@ def draw_dfa(dfa):
 
 def simulate_dfa(dfa, string):
     """
-    Simula la cadena en el AFD.
+    Simula la cadena en el AFD y agrega depuración para verificar las transiciones.
     """
     current_state = dfa.start_state
+    print(f"Estado inicial: {id(current_state)} - Aceptación: {current_state.is_accept}")
 
     for char in string:
         if char in current_state.transitions:
-            current_state = current_state.transitions[char][0]  # En el AFD, siempre hay una única transición por símbolo
+            next_state = current_state.transitions[char][0]
+            print(f"Transición con '{char}': {id(current_state)} -> {id(next_state)}")
+            current_state = next_state
         else:
-            return False  # Si no hay transición para el carácter actual, la cadena no pertenece al lenguaje
+            print(f"No hay transición para '{char}' desde el estado {id(current_state)}")
+            return False  # Si no hay transición válida, la cadena no pertenece al lenguaje
 
+    print(f"Estado final: {id(current_state)} - Aceptación: {current_state.is_accept}")
     return current_state.is_accept  # Verificar si se alcanza un estado de aceptación
 
 
@@ -425,26 +435,6 @@ def draw_nfa(nfa):
     traverse(nfa.start_state, set())
     return dot
 
-# def draw_dfa(dfa):
-    dot = graphviz.Digraph()
-
-    def add_state(state):
-        shape = 'doublecircle' if state.is_accept else 'circle'
-        dot.node(str(id(state)), shape=shape)
-        for char, states in state.transitions.items():
-            for s in states:
-                dot.edge(str(id(state)), str(id(s)), label=char)
-
-    def traverse(state, visited):
-        if state not in visited:
-            visited.add(state)
-            add_state(state)
-            for char, states in state.transitions.items():
-                for s in states:
-                    traverse(s, visited)
-
-    traverse(dfa.start_state, set())
-    return dot
 
 def process_file(input_file, output_file):
     with open(input_file, 'r') as infile, open(output_file, 'w') as outfile:
@@ -482,18 +472,22 @@ def process_file(input_file, output_file):
             dot_nfa.render(filename=gv_nfa_filename, format='png', cleanup=True)
 
             # Simular la cadena con el AFN
-            resultado = "sí" if simulate_nfa(nfa, cadena) else "no"
-            outfile.write(f"La cadena '{cadena}' pertenece al lenguaje de la expresión regular: {resultado}\n\n")
+            resultado_nfa = "sí" if simulate_nfa(nfa, cadena) else "no"
+            outfile.write(f"La cadena '{cadena}' pertenece al lenguaje de la expresión regular según el AFN: {resultado_nfa}\n\n")
             
-            
-
-            # Opción para también convertir AFN a AFD, minimizar y dibujar
+            # Convertir el AFN a AFD
             dfa = nfa_to_dfa(nfa)
 
-            resultado = "sí" if simulate_dfa(dfa, cadena) else "no"
-            outfile.write(f"La cadena '{cadena}' pertenece al lenguaje de la expresión regular según el AFD: {resultado}\n\n")
-            
+            # Dibujar el AFD
+            dot_dfa = draw_dfa(dfa)
+            gv_dfa_filename = f'dfa_{regex}'
+            dot_dfa.render(filename=gv_dfa_filename, format='png', cleanup=True)
 
+            # Simular la cadena con el AFD
+            resultado_dfa = "sí" if simulate_dfa(dfa, cadena) else "no"
+            outfile.write(f"La cadena '{cadena}' pertenece al lenguaje de la expresión regular según el AFD: {resultado_dfa}\n\n")
+
+            # Minimizar el AFD y dibujarlo
             minimized_dfa = minimize_dfa_partition_refinement(dfa)
             dot_minimized_dfa = draw_dfa(minimized_dfa)
             gv_min_dfa_filename = f'min_dfa_{regex}'
@@ -505,4 +499,3 @@ output_file = 'output_postfix.txt'
 
 # Procesar el archivo
 process_file(input_file, output_file)
-
