@@ -231,3 +231,101 @@ def minimize_dfa(dfa):
 
 def get_alphabet_from_dfa(dfa):
     return set(symbol for (_, symbol) in dfa.transition_table.keys())
+
+# 5. Simulación del AFD
+def simulate_dfa(dfa, input_string):
+    current_state = dfa.start_state
+    for symbol in input_string:
+        if (current_state, symbol) not in dfa.transition_table:
+            return False
+        current_state = dfa.transition_table[(current_state, symbol)]
+
+    return current_state in dfa.accept_states
+
+def simulate_nfa(nfa, input_string):
+    current_states = frozenset(epsilon_closure([nfa.start]))
+    for symbol in input_string:
+        next_states = set()
+        for state in current_states:
+            next_states.update(epsilon_closure(move([state], symbol)))
+        current_states = frozenset(next_states)
+
+    return nfa.end in current_states
+
+# 6. Generación de gráficos para NFA y DFA
+def draw_nfa(nfa, filename='nfa'):
+    dot = graphviz.Digraph(comment='NFA')
+    dot.attr(rankdir='LR')
+
+    def add_edges(state, visited):
+        if state in visited:
+            return
+        visited.add(state)
+        dot.node(str(state))
+        for symbol, next_state in state.edges:
+            dot.edge(str(state), str(next_state), label=symbol)
+            add_edges(next_state, visited)
+
+    add_edges(nfa.start, set())
+    dot.render(filename, format='png', cleanup=True)
+
+def draw_dfa(dfa, filename='dfa'):
+    dot = graphviz.Digraph(comment='DFA')
+    dot.attr(rankdir='LR')
+
+    for state in dfa.transition_table.keys():
+        if state in dfa.accept_states:
+            dot.node(str(state), shape='doublecircle')
+        else:
+            dot.node(str(state))
+
+    for (state, symbol), next_state in dfa.transition_table.items():
+        dot.edge(str(state), str(next_state), label=symbol)
+
+    dot.render(filename, format='png', cleanup=True)
+
+def draw_minimized_dfa(dfa, filename='minimized_dfa'):
+    dot = graphviz.Digraph(comment='Minimized DFA')
+    dot.attr(rankdir='LR')
+
+    for state in dfa.transition_table.keys():
+        if state in dfa.accept_states:
+            dot.node(str(state), shape='doublecircle')
+        else:
+            dot.node(str(state))
+
+    for (state, symbol), next_state in dfa.transition_table.items():
+        dot.edge(str(state), str(next_state), label=symbol)
+
+    dot.render(filename, format='png', cleanup=True)
+
+def main():
+    if len(sys.argv) != 2:
+        print("Usage: python regex_to_dfa.py '<regex>'")
+        sys.exit(1)
+
+    regex = sys.argv[1]
+
+    postfix_expr = infix_to_postfix(regex)
+    nfa = build_nfa(postfix_expr)
+    dfa = convert_nfa_to_dfa(nfa)
+    minimized_dfa = minimize_dfa(dfa)
+
+    draw_nfa(nfa)
+    draw_dfa(dfa)
+    draw_minimized_dfa(minimized_dfa)
+
+    print("NFA:")
+    print("Start state:", nfa.start)
+    print("End state:", nfa.end)
+
+    print("\nDFA:")
+    print("Start state:", dfa.start_state)
+    print("Accept states:", dfa.accept_states)
+
+    print("\nMinimized DFA:")
+    print("Start state:", minimized_dfa.start_state)
+    print("Accept states:", minimized_dfa.accept_states)
+
+if __name__ == '__main__':
+    main()
