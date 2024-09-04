@@ -1,5 +1,1 @@
-(b|b)*abb(a|b)*,bbabbabaa
-(a|b)*abb,ababb
-(a|b)*abb(b|a)*,aaabbb
-((a|b)*abb)|b*,abb
-(a(b|c))*|d*,abc
+(a|b)*abb
