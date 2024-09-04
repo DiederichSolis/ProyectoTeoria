@@ -1,0 +1,36 @@
+Original: (b|b)*abb(a|b)*
+Cadena a verificar: babbbaaaa
+Postfix: bb|*a.b.b.ab|*.
+Pasos de conversión a Postfix:
+Pushed '(' to stack
+Added 'b' to postfix expression
+Pushed '|' to stack
+Added 'b' to postfix expression
+Popped '|' from stack to postfix expression
+Popped '(' from stack
+Pushed '*' to stack
+Popped '*' from stack to postfix expression
+Pushed '.' to stack
+Added 'a' to postfix expression
+Popped '.' from stack to postfix expression
+Pushed '.' to stack
+Added 'b' to postfix expression
+Popped '.' from stack to postfix expression
+Pushed '.' to stack
+Added 'b' to postfix expression
+Popped '.' from stack to postfix expression
+Pushed '.' to stack
+Pushed '(' to stack
+Added 'a' to postfix expression
+Pushed '|' to stack
+Added 'b' to postfix expression
+Popped '|' from stack to postfix expression
+Popped '(' from stack
+Pushed '*' to stack
+Popped '*' from stack to postfix expression
+Popped '.' from stack to postfix expression
+
+La cadena 'babbbaaaa' pertenece al lenguaje de la expresión regular: sí
+
+La cadena 'babbbaaaa' pertenece al lenguaje de la expresión regular según el AFD: sí
+

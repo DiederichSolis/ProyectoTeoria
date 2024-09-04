@@ -1,331 +1,508 @@
 import graphviz
-from collections import defaultdict, deque
-import sys
 
-# 1. Conversión de Infix a Postfix
-def infix_to_postfix(infix_expr):
-    precedence = {'*': 3, '.': 2, '|': 1}
-    output = []
-    stack = []
+class Node:
+    def __init__(self, value, left=None, right=None):
+        self.value = value
+        self.left = left
+        self.right = right
+        self.id = id(self)  # Unique ID for Graphviz
 
-    def is_operator(c):
-        return c in precedence
-
-    def precedence_order(c):
-        return precedence[c]
-
-    for char in infix_expr:
-        if char.isalnum() or char == 'ε':
-            output.append(char)
-        elif char == '(':
-            stack.append(char)
-        elif char == ')':
-            while stack and stack[-1] != '(':
-                output.append(stack.pop())
-            stack.pop()  # Pop '('
-        else:  # Operator
-            while stack and stack[-1] != '(' and precedence_order(stack[-1]) >= precedence_order(char):
-                output.append(stack.pop())
-            stack.append(char)
-
-    while stack:
-        output.append(stack.pop())
-
-    return ''.join(output)
-
-# 2. Construcción de un AFN a partir de la expresión Postfix
 class State:
-    def __init__(self, name=None):
-        self.name = name
-        self.edges = []
-
-    def __str__(self):
-        return self.name or f"State_{id(self)}"
-
-    def __repr__(self):
-        return self.__str__()
+    def __init__(self, is_accept=False, is_deterministic=False):
+        self.is_accept = is_accept
+        self.is_deterministic = is_deterministic  # AFD or AFN
+        self.transitions = {}  # Diccionario que mapea input a estado(s)
+        self.epsilon_transitions = []
 
 class NFA:
-    def __init__(self, start, end):
-        self.start = start
-        self.end = end
+    def __init__(self, start_state, accept_state):
+        self.start_state = start_state
+        self.accept_state = accept_state
 
-def build_nfa(postfix_expr):
+def postfix_to_ast(postfix):
     stack = []
 
-    for char in postfix_expr:
+    for char in postfix:
         if char.isalnum() or char == 'ε':
-            start = State(name=f"Start_{char}")
-            end = State(name=f"End_{char}")
-            start.edges.append((char, end))
-            stack.append(NFA(start, end))
-        elif char == '.':
-            nfa2 = stack.pop()
-            nfa1 = stack.pop()
-            nfa1.end.edges.append(('ε', nfa2.start))
-            stack.append(NFA(nfa1.start, nfa2.end))
-        elif char == '|':
-            nfa2 = stack.pop()
-            nfa1 = stack.pop()
-            start = State(name="Start_Choice")
-            end = State(name="End_Choice")
-            start.edges.append(('ε', nfa1.start))
-            start.edges.append(('ε', nfa2.start))
-            nfa1.end.edges.append(('ε', end))
-            nfa2.end.edges.append(('ε', end))
-            stack.append(NFA(start, end))
-        elif char == '*':
-            nfa = stack.pop()
-            start = State(name="Start_Star")
-            end = State(name="End_Star")
-            start.edges.append(('ε', nfa.start))
-            start.edges.append(('ε', end))
-            nfa.end.edges.append(('ε', end))
-            nfa.end.edges.append(('ε', nfa.start))
-            stack.append(NFA(start, end))
-
+            stack.append(Node(char))
+        else:
+            if char == '*':
+                operand = stack.pop()
+                stack.append(Node(char, left=operand))
+            else:
+                right = stack.pop()
+                left = stack.pop()
+                stack.append(Node(char, left, right))
+    
     return stack.pop()
 
-# 3. Conversión de AFN a AFD
-class DFA:
-    def __init__(self, start_state, accept_states, transition_table):
-        self.start_state = start_state
-        self.accept_states = accept_states
-        self.transition_table = transition_table
+def draw_ast(root):
+    def add_nodes_edges(graph, node):
+        graph.node(str(node.id), node.value)
+        if node.left:
+            graph.edge(str(node.id), str(node.left.id))
+            add_nodes_edges(graph, node.left)
+        if node.right:
+            graph.edge(str(node.id), str(node.right.id))
+            add_nodes_edges(graph, node.right)
 
-def convert_nfa_to_dfa(nfa):
-    initial_state = frozenset(epsilon_closure([nfa.start]))
-    states = {initial_state}
-    unmarked_states = [initial_state]
-    dfa_transitions = {}
-    dfa_accept_states = set()
+    dot = graphviz.Digraph()
+    add_nodes_edges(dot, root)
+    return dot
 
-    while unmarked_states:
-        current = unmarked_states.pop()
-        for symbol in get_alphabet(nfa):
-            next_state = frozenset(epsilon_closure(move(current, symbol)))
-            if not next_state:
-                continue
-            if next_state not in states:
-                states.add(next_state)
-                unmarked_states.append(next_state)
-            dfa_transitions[(current, symbol)] = next_state
+def extend_regex(regex):
+    return regex.replace('+', '*').replace('?', '|ε')
 
-        if nfa.end in current:
-            dfa_accept_states.add(current)
+def get_precedence(c):
+    precedence = {
+        '(': 1,
+        '|': 2,
+        '.': 3,
+        '?': 4,
+        '*': 4,
+        '+': 4,
+        '^': 5
+    }
+    return precedence.get(c, 6)
 
-    return DFA(initial_state, dfa_accept_states, dfa_transitions)
+def format_regex(regex):
+    all_operators = ['|', '?', '+', '*', '^']
+    binary_operators = ['^', '|']
+    res = ""
+    
+    i = 0
+    while i < len(regex):
+        c1 = regex[i]
+        if i + 1 < len(regex):
+            c2 = regex[i + 1]
+            res += c1
+            if (c1 != '(' and c2 != ')' and c2 not in all_operators and c1 not in binary_operators):
+                res += '.'
+        i += 1
+    res += regex[-1]
+    
+    return res
 
-def epsilon_closure(states):
-    stack = list(states)
-    closure = set(states)
+def infix_to_postfix(regex):
+    postfix = ""
+    stack = []
+    formatted_regex = format_regex(regex)
+    steps = []
+
+    for c in formatted_regex:
+        if c.isalnum() or c == 'ε':
+            postfix += c
+            steps.append(f"Added '{c}' to postfix expression")
+        elif c == '(':
+            stack.append(c)
+            steps.append(f"Pushed '{c}' to stack")
+        elif c == ')':
+            while stack and stack[-1] != '(':
+                top = stack.pop()
+                postfix += top
+                steps.append(f"Popped '{top}' from stack to postfix expression")
+            stack.pop()  # Remove '(' from stack
+            steps.append(f"Popped '(' from stack")
+        else:
+            while stack and get_precedence(stack[-1]) >= get_precedence(c):
+                top = stack.pop()
+                postfix += top
+                steps.append(f"Popped '{top}' from stack to postfix expression")
+            stack.append(c)
+            steps.append(f"Pushed '{c}' to stack")
 
     while stack:
-        state = stack.pop()
-        for symbol, next_state in state.edges:
-            if symbol == 'ε' and next_state not in closure:
-                closure.add(next_state)
-                stack.append(next_state)
+        top = stack.pop()
+        postfix += top
+        steps.append(f"Popped '{top}' from stack to postfix expression")
+    
+    return postfix, steps
 
-    return closure
+def thompson_construct(node):
+    if node.value == '*':
+        start = State()
+        accept = State(is_accept=True)
+        nfa = thompson_construct(node.left)
 
-def move(states, symbol):
-    result = set()
-    for state in states:
-        for sym, next_state in state.edges:
-            if sym == symbol:
-                result.add(next_state)
-    return result
+        start.epsilon_transitions.append(nfa.start_state)
+        start.epsilon_transitions.append(accept)
+        nfa.accept_state.epsilon_transitions.append(nfa.start_state)
+        nfa.accept_state.epsilon_transitions.append(accept)
 
-def get_alphabet(nfa):
-    alphabet = set()
-    states_to_check = [nfa.start]
-    checked_states = set()
+        return NFA(start, accept)
 
-    while states_to_check:
-        state = states_to_check.pop()
-        if state in checked_states:
-            continue
-        checked_states.add(state)
-        for symbol, next_state in state.edges:
-            if symbol != 'ε':
-                alphabet.add(symbol)
-            states_to_check.append(next_state)
+    elif node.value == '|':
+        start = State()
+        accept = State(is_accept=True)
+        left_nfa = thompson_construct(node.left)
+        right_nfa = thompson_construct(node.right)
 
-    return alphabet
+        start.epsilon_transitions.append(left_nfa.start_state)
+        start.epsilon_transitions.append(right_nfa.start_state)
+        left_nfa.accept_state.epsilon_transitions.append(accept)
+        right_nfa.accept_state.epsilon_transitions.append(accept)
 
-# 4. Minimización del AFD
-def minimize_dfa(dfa):
-    states = set()
-    for (state, symbol) in dfa.transition_table.keys():
-        states.add(state)
-        states.add(dfa.transition_table.get((state, symbol), None))
-    states.discard(None)
+        return NFA(start, accept)
 
-    non_accept_states = states - dfa.accept_states
-    partitions = [set(dfa.accept_states), non_accept_states]
-    new_partitions = []
+    elif node.value == '.':
+        left_nfa = thompson_construct(node.left)
+        right_nfa = thompson_construct(node.right)
 
-    while partitions != new_partitions:
-        if new_partitions:
-            partitions = new_partitions[:]
-            new_partitions = []
+        left_nfa.accept_state.epsilon_transitions.append(right_nfa.start_state)
 
-        for group in partitions:
-            subgroups = {}
-            for state in group:
-                transition_signature = tuple(
-                    dfa.transition_table.get((state, symbol), None) for symbol in get_alphabet_from_dfa(dfa)
-                )
-                if transition_signature not in subgroups:
-                    subgroups[transition_signature] = set()
-                subgroups[transition_signature].add(state)
-            
-            new_partitions.extend(subgroups.values())
+        return NFA(left_nfa.start_state, right_nfa.accept_state)
 
-    new_states = {}
-    for i, group in enumerate(new_partitions):
-        new_states[frozenset(group)] = i
+    else:
+        start = State()
+        accept = State(is_accept=True)
+        start.transitions[node.value] = [accept]
 
-    minimized_transitions = {}
-    for (state, symbol) in dfa.transition_table.keys():
-        dest = dfa.transition_table.get((state, symbol), None)
-        if dest is not None:
-            source_group = None
-            dest_group = None
-            
-            for group in new_states.keys():
-                if state in group:
-                    source_group = group
-                if dest in group:
-                    dest_group = group
-            
-            if source_group is not None and dest_group is not None:
-                minimized_transitions[(new_states[source_group], symbol)] = new_states[dest_group]
+        return NFA(start, accept)
+
+def nfa_to_dfa(nfa):
+    def epsilon_closure(states):
+        closure = set(states)
+        stack = list(states)
+        while stack:
+            state = stack.pop()
+            for next_state in state.epsilon_transitions:
+                if next_state not in closure:
+                    closure.add(next_state)
+                    stack.append(next_state)
+        return closure
+
+    def move(states, char):
+        next_states = set()
+        for state in states:
+            if char in state.transitions:
+                next_states.update(state.transitions[char])
+        return next_states
+
+    # Estado inicial del AFD es el epsilon-cierre del estado inicial del AFN
+    start_state_closure = epsilon_closure([nfa.start_state])
+    start_state = State(is_deterministic=True)
+    dfa_states = {frozenset(start_state_closure): start_state}
+    unprocessed = [start_state_closure]
+    dfa_accept_state = None
+
+    while unprocessed:
+        current_closure = unprocessed.pop()
+        current_dfa_state = dfa_states[frozenset(current_closure)]
+
+        # Verificar si este conjunto de estados contiene un estado de aceptación
+        if any(state.is_accept for state in current_closure):
+            current_dfa_state.is_accept = True
+            dfa_accept_state = current_dfa_state
+
+        # Procesar cada símbolo del alfabeto (excepto epsilon)
+        alphabet = set()
+        for state in current_closure:
+            alphabet.update(state.transitions.keys())
+
+        for char in alphabet:
+            if char == 'ε':
+                continue
+            next_closure = epsilon_closure(move(current_closure, char))
+
+            if frozenset(next_closure) not in dfa_states:
+                new_dfa_state = State(is_deterministic=True)
+                dfa_states[frozenset(next_closure)] = new_dfa_state
+                unprocessed.append(next_closure)
             else:
-                print(f"Error: No se encontró source_group o dest_group en new_states.")
-                print(f"source_group: {source_group}")
-                print(f"dest_group: {dest_group}")
-                print(f"new_states keys: {list(new_states.keys())}")
-                raise KeyError(f"Falta {dest_group} en new_states")
+                new_dfa_state = dfa_states[frozenset(next_closure)]
 
-    minimized_start_state = None
-    for group in new_partitions:
-        if dfa.start_state in group:
-            minimized_start_state = new_states[frozenset(group)]
+            current_dfa_state.transitions[char] = [new_dfa_state]
+
+    return NFA(start_state, dfa_accept_state)
+
+
+def minimize_dfa_partition_refinement(dfa):
+    """
+    Minimiza el AFD utilizando el refinamiento de particiones, basado en los estados indistinguibles.
+    """
+    # Paso 1: Eliminar los estados no alcanzables
+    dfa = eliminate_unreachable_states(dfa)
+
+    all_states = list(get_all_states(dfa))
+
+    # Paso 2: Inicialización - Particionar en dos grupos: estados de aceptación y no aceptación
+    final_states = {state for state in all_states if state.is_accept}
+    non_final_states = {state for state in all_states if not state.is_accept}
+
+    partitions = [final_states, non_final_states]
+    work_list = [final_states, non_final_states]  # Para seguir refinando
+
+    # Paso 3: Refinar las particiones
+    alphabet = set(char for state in all_states for char in state.transitions.keys())
+
+    while work_list:
+        current_partition = work_list.pop()
+
+        # Iterar sobre cada símbolo en el alfabeto
+        for char in alphabet:
+            # Encontrar el conjunto de estados que transitan hacia la partición actual con el símbolo actual
+            involved_states = {state for state in all_states if char in state.transitions and state.transitions[char][0] in current_partition}
+            
+            new_partitions = []
+            for partition in partitions:
+                intersect = partition.intersection(involved_states)
+                difference = partition.difference(involved_states)
+
+                # Refinar la partición si es necesario
+                if intersect and difference:
+                    new_partitions.append(intersect)
+                    new_partitions.append(difference)
+
+                    # Ver si alguna de las dos particiones debe ser agregada al work_list
+                    if partition in work_list:
+                        work_list.remove(partition)
+                        work_list.append(intersect)
+                        work_list.append(difference)
+                    else:
+                        if len(intersect) <= len(difference):
+                            work_list.append(intersect)
+                        else:
+                            work_list.append(difference)
+                else:
+                    new_partitions.append(partition)
+
+            partitions = new_partitions
+
+    # Paso 4: Construir el AFD minimizado (omitir particiones vacías)
+    minimized_states = {
+        frozenset(partition): State(is_accept=next(iter(partition)).is_accept, is_deterministic=True)
+        for partition in partitions if partition
+    }
+    
+    # Paso 5: Encontrar la partición que contiene el estado inicial
+    start_partition = next(partition for partition in partitions if dfa.start_state in partition)
+    minimized_start_state = minimized_states[frozenset(start_partition)]
+
+    # Paso 6: Encontrar la partición que contiene el estado de aceptación y manejar múltiples estados de aceptación
+    accept_partition = None
+    for partition in partitions:
+        if dfa.accept_state in partition:
+            accept_partition = partition
             break
 
-    if minimized_start_state is None:
-        print(f"Error: El estado inicial del DFA no se encuentra en new_states.")
-        print(f"dfa.start_state: {dfa.start_state}")
-        print(f"new_states keys: {list(new_states.keys())}")
-        raise KeyError(f"El estado inicial no se encuentra en new_states.")
+    if accept_partition is None:
+        raise ValueError("El estado de aceptación no fue encontrado en las particiones.")
 
-    minimized_accept_states = {new_states[frozenset(group)] for group in new_partitions if group & set(dfa.accept_states)}
+    minimized_accept_state = minimized_states[frozenset(accept_partition)]
 
-    return DFA(
-        minimized_start_state,
-        minimized_accept_states,
-        minimized_transitions
-    )
+    # Paso 7: Asignar las transiciones del AFD minimizado
+    for partition, minimized_state in minimized_states.items():
+        if partition:  # Asegurarse de no iterar sobre particiones vacías
+            representative_state = next(iter(partition))
+            for char, next_state in representative_state.transitions.items():
+                next_partition = next(p for p in partitions if next_state[0] in p)
+                minimized_state.transitions[char] = [minimized_states[frozenset(next_partition)]]
 
-def get_alphabet_from_dfa(dfa):
-    return set(symbol for (_, symbol) in dfa.transition_table.keys())
+    return NFA(minimized_start_state, minimized_accept_state)
 
-# 5. Simulación del AFD
-def simulate_dfa(dfa, input_string):
+def eliminate_unreachable_states(dfa):
+    """
+    Elimina los estados no alcanzables desde el estado inicial.
+    """
+    reachable = set()
+    to_visit = [dfa.start_state]
+
+    while to_visit:
+        state = to_visit.pop()
+        if state not in reachable:
+            reachable.add(state)
+            for next_states in state.transitions.values():
+                to_visit.extend(next_states)
+    
+    # Crear nuevo AFD solo con los estados alcanzables
+    return NFA(dfa.start_state, dfa.accept_state if dfa.accept_state in reachable else None)
+
+def get_all_states(dfa):
+    """
+    Realiza una búsqueda en profundidad para obtener todos los estados del AFD.
+    """
+    visited = set()
+    to_visit = [dfa.start_state]
+
+    while to_visit:
+        current = to_visit.pop()
+        if current not in visited:
+            visited.add(current)
+            for next_states in current.transitions.values():
+                to_visit.extend(next_states)
+
+    return visited
+
+def draw_dfa(dfa):
+    """
+    Dibuja el AFD utilizando graphviz.
+    """
+    import graphviz
+    dot = graphviz.Digraph()
+
+    def add_state(state):
+        shape = 'doublecircle' if state.is_accept else 'circle'
+        dot.node(str(id(state)), shape=shape)
+        for char, next_states in state.transitions.items():
+            for s in next_states:
+                dot.edge(str(id(state)), str(id(s)), label=char)
+
+    def traverse(state, visited):
+        if state not in visited:
+            visited.add(state)
+            add_state(state)
+            for char, next_states in state.transitions.items():
+                for s in next_states:
+                    traverse(s, visited)
+
+    traverse(dfa.start_state, set())
+    return dot
+
+
+def simulate_dfa(dfa, string):
+    """
+    Simula la cadena en el AFD.
+    """
     current_state = dfa.start_state
-    for symbol in input_string:
-        if (current_state, symbol) not in dfa.transition_table:
-            return False
-        current_state = dfa.transition_table[(current_state, symbol)]
 
-    return current_state in dfa.accept_states
+    for char in string:
+        if char in current_state.transitions:
+            current_state = current_state.transitions[char][0]  # En el AFD, siempre hay una única transición por símbolo
+        else:
+            return False  # Si no hay transición para el carácter actual, la cadena no pertenece al lenguaje
 
-def simulate_nfa(nfa, input_string):
-    current_states = frozenset(epsilon_closure([nfa.start]))
-    for symbol in input_string:
-        next_states = set()
+    return current_state.is_accept  # Verificar si se alcanza un estado de aceptación
+
+
+def simulate_nfa(nfa, string):
+    current_states = set()
+    next_states = set()
+
+    def epsilon_closure(states):
+        closure = set(states)
+        stack = list(states)
+        while stack:
+            state = stack.pop()
+            for next_state in state.epsilon_transitions:
+                if next_state not in closure:
+                    closure.add(next_state)
+                    stack.append(next_state)
+        return closure
+
+    current_states = epsilon_closure([nfa.start_state])
+
+    for char in string:
         for state in current_states:
-            next_states.update(epsilon_closure(move([state], symbol)))
-        current_states = frozenset(next_states)
+            if char in state.transitions:
+                next_states.update(state.transitions[char])
+        current_states = epsilon_closure(next_states)
+        next_states.clear()
 
-    return nfa.end in current_states
+    return nfa.accept_state in current_states
 
-# 6. Generación de gráficos para NFA y DFA
-def draw_nfa(nfa, filename='nfa'):
-    dot = graphviz.Digraph(comment='NFA')
-    dot.attr(rankdir='LR')
+def draw_nfa(nfa):
+    dot = graphviz.Digraph()
 
-    def add_edges(state, visited):
-        if state in visited:
-            return
-        visited.add(state)
-        dot.node(str(state))
-        for symbol, next_state in state.edges:
-            dot.edge(str(state), str(next_state), label=symbol)
-            add_edges(next_state, visited)
+    def add_state(state):
+        shape = 'doublecircle' if state.is_accept else 'circle'
+        dot.node(str(id(state)), shape=shape)
+        for char, states in state.transitions.items():
+            for s in states:
+                dot.edge(str(id(state)), str(id(s)), label=char)
+        for s in state.epsilon_transitions:
+            dot.edge(str(id(state)), str(id(s)), label='ε')
 
-    add_edges(nfa.start, set())
-    dot.render(filename, format='png', cleanup=True)
+    def traverse(state, visited):
+        if state not in visited:
+            visited.add(state)
+            add_state(state)
+            for char, states in state.transitions.items():
+                for s in states:
+                    traverse(s, visited)
+            for s in state.epsilon_transitions:
+                traverse(s, visited)
 
-def draw_dfa(dfa, filename='dfa'):
-    dot = graphviz.Digraph(comment='DFA')
-    dot.attr(rankdir='LR')
+    traverse(nfa.start_state, set())
+    return dot
 
-    for state in dfa.transition_table.keys():
-        if state in dfa.accept_states:
-            dot.node(str(state), shape='doublecircle')
-        else:
-            dot.node(str(state))
+# def draw_dfa(dfa):
+    dot = graphviz.Digraph()
 
-    for (state, symbol), next_state in dfa.transition_table.items():
-        dot.edge(str(state), str(next_state), label=symbol)
+    def add_state(state):
+        shape = 'doublecircle' if state.is_accept else 'circle'
+        dot.node(str(id(state)), shape=shape)
+        for char, states in state.transitions.items():
+            for s in states:
+                dot.edge(str(id(state)), str(id(s)), label=char)
 
-    dot.render(filename, format='png', cleanup=True)
+    def traverse(state, visited):
+        if state not in visited:
+            visited.add(state)
+            add_state(state)
+            for char, states in state.transitions.items():
+                for s in states:
+                    traverse(s, visited)
 
-def draw_minimized_dfa(dfa, filename='minimized_dfa'):
-    dot = graphviz.Digraph(comment='Minimized DFA')
-    dot.attr(rankdir='LR')
+    traverse(dfa.start_state, set())
+    return dot
 
-    for state in dfa.transition_table.keys():
-        if state in dfa.accept_states:
-            dot.node(str(state), shape='doublecircle')
-        else:
-            dot.node(str(state))
+def process_file(input_file, output_file):
+    with open(input_file, 'r') as infile, open(output_file, 'w') as outfile:
+        for line in infile:
+            # Separar la expresión regular y la cadena
+            if ',' not in line:
+                continue
+            regex, cadena = line.strip().split(',')
 
-    for (state, symbol), next_state in dfa.transition_table.items():
-        dot.edge(str(state), str(next_state), label=symbol)
+            # Extender la expresión regular para manejar operadores adicionales
+            extended_regex = extend_regex(regex)
+            postfix, steps = infix_to_postfix(extended_regex)
+            
+            # Escribir información en el archivo de salida
+            outfile.write(f"Original: {regex}\n")
+            outfile.write(f"Cadena a verificar: {cadena}\n")
+            outfile.write(f"Postfix: {postfix}\n")
+            outfile.write("Pasos de conversión a Postfix:\n")
+            for step in steps:
+                outfile.write(f"{step}\n")
+            outfile.write("\n")
+            
+            # Construir el árbol sintáctico (AST) y luego el AFN
+            root = postfix_to_ast(postfix)
+            nfa = thompson_construct(root)
+            
+            # Dibujar el AST
+            dot_ast = draw_ast(root)
+            gv_ast_filename = f'ast_{regex}'
+            dot_ast.render(filename=gv_ast_filename, format='png', cleanup=True)
+            
+            # Dibujar el AFN
+            dot_nfa = draw_nfa(nfa)
+            gv_nfa_filename = f'nfa_{regex}'
+            dot_nfa.render(filename=gv_nfa_filename, format='png', cleanup=True)
 
-    dot.render(filename, format='png', cleanup=True)
+            # Simular la cadena con el AFN
+            resultado = "sí" if simulate_nfa(nfa, cadena) else "no"
+            outfile.write(f"La cadena '{cadena}' pertenece al lenguaje de la expresión regular: {resultado}\n\n")
+            
+            
 
-def main():
-    if len(sys.argv) != 2:
-        print("Usage: python regex_to_dfa.py '<regex>'")
-        sys.exit(1)
+            # Opción para también convertir AFN a AFD, minimizar y dibujar
+            dfa = nfa_to_dfa(nfa)
 
-    regex = sys.argv[1]
+            resultado = "sí" if simulate_dfa(dfa, cadena) else "no"
+            outfile.write(f"La cadena '{cadena}' pertenece al lenguaje de la expresión regular según el AFD: {resultado}\n\n")
+            
 
-    postfix_expr = infix_to_postfix(regex)
-    nfa = build_nfa(postfix_expr)
-    dfa = convert_nfa_to_dfa(nfa)
-    minimized_dfa = minimize_dfa(dfa)
+            minimized_dfa = minimize_dfa_partition_refinement(dfa)
+            dot_minimized_dfa = draw_dfa(minimized_dfa)
+            gv_min_dfa_filename = f'min_dfa_{regex}'
+            dot_minimized_dfa.render(filename=gv_min_dfa_filename, format='png', cleanup=True)
 
-    draw_nfa(nfa)
-    draw_dfa(dfa)
-    draw_minimized_dfa(minimized_dfa)
+# Archivo de entrada y salida
+input_file = 'expresiones.txt'
+output_file = 'output_postfix.txt'
 
-    print("NFA:")
-    print("Start state:", nfa.start)
-    print("End state:", nfa.end)
+# Procesar el archivo
+process_file(input_file, output_file)
 
-    print("\nDFA:")
-    print("Start state:", dfa.start_state)
-    print("Accept states:", dfa.accept_states)
-
-    print("\nMinimized DFA:")
-    print("Start state:", minimized_dfa.start_state)
-    print("Accept states:", minimized_dfa.accept_states)
-
-if __name__ == '__main__':
-    main()

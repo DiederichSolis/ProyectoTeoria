@@ -1,1 +1,1 @@
-(a|b)*abb
+(b|b)*abb(a|b)*,babbbaaaa
