@@ -1,5 +1,10 @@
 import graphviz
 
+class Metachar:
+    def __init__(self, value):
+        self.value = "\\?"
+        
+
 class Node:
     def __init__(self, value, left=None, right=None):
         self.value = value

@@ -1,1 +1,10 @@
-(a|b)*abb,ababab
+(a|b)*ab,baba
+(a|b)*ab,baab
+a*ba*,ab
+a*ba*,bb
+(ab|ba)+,abab
+(ab|ba)+,aa
+b*a*,aa
+b*a*,baab
+(a|bb)+,bb
+(a|bb)+,bbbb

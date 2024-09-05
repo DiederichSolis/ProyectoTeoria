@@ -1,6 +1,6 @@
-Original: (a|b)*abb
-Cadena a verificar: ababab
-Postfix: ab|*a.b.b.
+Original: (a|b)*ab
+Cadena a verificar: baba
+Postfix: ab|*a.b.
 Pasos de conversión a Postfix:
 Pushed '(' to stack
 Added 'a' to postfix expression
@@ -16,11 +16,191 @@ Popped '.' from stack to postfix expression
 Pushed '.' to stack
 Added 'b' to postfix expression
 Popped '.' from stack to postfix expression
+
+La cadena 'baba' pertenece al lenguaje de la expresión regular según el AFN: no
+
+La cadena 'baba' pertenece al lenguaje de la expresión regular según el AFD: no
+
+Original: (a|b)*ab
+Cadena a verificar: baab
+Postfix: ab|*a.b.
+Pasos de conversión a Postfix:
+Pushed '(' to stack
+Added 'a' to postfix expression
+Pushed '|' to stack
+Added 'b' to postfix expression
+Popped '|' from stack to postfix expression
+Popped '(' from stack
+Pushed '*' to stack
+Popped '*' from stack to postfix expression
+Pushed '.' to stack
+Added 'a' to postfix expression
+Popped '.' from stack to postfix expression
 Pushed '.' to stack
 Added 'b' to postfix expression
 Popped '.' from stack to postfix expression
 
-La cadena 'ababab' pertenece al lenguaje de la expresión regular según el AFN: no
+La cadena 'baab' pertenece al lenguaje de la expresión regular según el AFN: sí
 
-La cadena 'ababab' pertenece al lenguaje de la expresión regular según el AFD: no
+La cadena 'baab' pertenece al lenguaje de la expresión regular según el AFD: sí
+
+Original: a*ba*
+Cadena a verificar: ab
+Postfix: a*b.a*.
+Pasos de conversión a Postfix:
+Added 'a' to postfix expression
+Pushed '*' to stack
+Popped '*' from stack to postfix expression
+Pushed '.' to stack
+Added 'b' to postfix expression
+Popped '.' from stack to postfix expression
+Pushed '.' to stack
+Added 'a' to postfix expression
+Pushed '*' to stack
+Popped '*' from stack to postfix expression
+Popped '.' from stack to postfix expression
+
+La cadena 'ab' pertenece al lenguaje de la expresión regular según el AFN: sí
+
+La cadena 'ab' pertenece al lenguaje de la expresión regular según el AFD: sí
+
+Original: a*ba*
+Cadena a verificar: bb
+Postfix: a*b.a*.
+Pasos de conversión a Postfix:
+Added 'a' to postfix expression
+Pushed '*' to stack
+Popped '*' from stack to postfix expression
+Pushed '.' to stack
+Added 'b' to postfix expression
+Popped '.' from stack to postfix expression
+Pushed '.' to stack
+Added 'a' to postfix expression
+Pushed '*' to stack
+Popped '*' from stack to postfix expression
+Popped '.' from stack to postfix expression
+
+La cadena 'bb' pertenece al lenguaje de la expresión regular según el AFN: no
+
+La cadena 'bb' pertenece al lenguaje de la expresión regular según el AFD: no
+
+Original: (ab|ba)+
+Cadena a verificar: abab
+Postfix: ab.ba.|*
+Pasos de conversión a Postfix:
+Pushed '(' to stack
+Added 'a' to postfix expression
+Pushed '.' to stack
+Added 'b' to postfix expression
+Popped '.' from stack to postfix expression
+Pushed '|' to stack
+Added 'b' to postfix expression
+Pushed '.' to stack
+Added 'a' to postfix expression
+Popped '.' from stack to postfix expression
+Popped '|' from stack to postfix expression
+Popped '(' from stack
+Pushed '*' to stack
+Popped '*' from stack to postfix expression
+
+La cadena 'abab' pertenece al lenguaje de la expresión regular según el AFN: sí
+
+La cadena 'abab' pertenece al lenguaje de la expresión regular según el AFD: sí
+
+Original: (ab|ba)+
+Cadena a verificar: aa
+Postfix: ab.ba.|*
+Pasos de conversión a Postfix:
+Pushed '(' to stack
+Added 'a' to postfix expression
+Pushed '.' to stack
+Added 'b' to postfix expression
+Popped '.' from stack to postfix expression
+Pushed '|' to stack
+Added 'b' to postfix expression
+Pushed '.' to stack
+Added 'a' to postfix expression
+Popped '.' from stack to postfix expression
+Popped '|' from stack to postfix expression
+Popped '(' from stack
+Pushed '*' to stack
+Popped '*' from stack to postfix expression
+
+La cadena 'aa' pertenece al lenguaje de la expresión regular según el AFN: no
+
+La cadena 'aa' pertenece al lenguaje de la expresión regular según el AFD: no
+
+Original: b*a*
+Cadena a verificar: aa
+Postfix: b*a*.
+Pasos de conversión a Postfix:
+Added 'b' to postfix expression
+Pushed '*' to stack
+Popped '*' from stack to postfix expression
+Pushed '.' to stack
+Added 'a' to postfix expression
+Pushed '*' to stack
+Popped '*' from stack to postfix expression
+Popped '.' from stack to postfix expression
+
+La cadena 'aa' pertenece al lenguaje de la expresión regular según el AFN: sí
+
+La cadena 'aa' pertenece al lenguaje de la expresión regular según el AFD: sí
+
+Original: b*a*
+Cadena a verificar: baab
+Postfix: b*a*.
+Pasos de conversión a Postfix:
+Added 'b' to postfix expression
+Pushed '*' to stack
+Popped '*' from stack to postfix expression
+Pushed '.' to stack
+Added 'a' to postfix expression
+Pushed '*' to stack
+Popped '*' from stack to postfix expression
+Popped '.' from stack to postfix expression
+
+La cadena 'baab' pertenece al lenguaje de la expresión regular según el AFN: no
+
+La cadena 'baab' pertenece al lenguaje de la expresión regular según el AFD: no
+
+Original: (a|bb)+
+Cadena a verificar: bb
+Postfix: abb.|*
+Pasos de conversión a Postfix:
+Pushed '(' to stack
+Added 'a' to postfix expression
+Pushed '|' to stack
+Added 'b' to postfix expression
+Pushed '.' to stack
+Added 'b' to postfix expression
+Popped '.' from stack to postfix expression
+Popped '|' from stack to postfix expression
+Popped '(' from stack
+Pushed '*' to stack
+Popped '*' from stack to postfix expression
+
+La cadena 'bb' pertenece al lenguaje de la expresión regular según el AFN: sí
+
+La cadena 'bb' pertenece al lenguaje de la expresión regular según el AFD: sí
+
+Original: (a|bb)+
+Cadena a verificar: bbbb
+Postfix: abb.|*
+Pasos de conversión a Postfix:
+Pushed '(' to stack
+Added 'a' to postfix expression
+Pushed '|' to stack
+Added 'b' to postfix expression
+Pushed '.' to stack
+Added 'b' to postfix expression
+Popped '.' from stack to postfix expression
+Popped '|' from stack to postfix expression
+Popped '(' from stack
+Pushed '*' to stack
+Popped '*' from stack to postfix expression
+
+La cadena 'bbbb' pertenece al lenguaje de la expresión regular según el AFN: sí
+
+La cadena 'bbbb' pertenece al lenguaje de la expresión regular según el AFD: sí
 
